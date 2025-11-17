@@ -8,8 +8,8 @@
 
 Before you begin, ensure you have the following installed:
 
-- **Python 3.11** or higher
-- **Poetry** 1.6+ (Python dependency management)
+- **Python 3.14** or higher
+- **UV** (https://github.com/astral-sh/uv) - Fast Python package manager
 - **Docker** and **Docker Compose** (for running tests with Testcontainers)
 - **Azure CLI** 2.50+ (for local authentication)
 - **Git** (for version control)
@@ -35,14 +35,13 @@ cd mdc-agent
 ### 2. Install Python Dependencies
 
 ```bash
-# Install Poetry if not already installed
-curl -sSL https://install.python-poetry.org | python3 -
+# Install UV if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install project dependencies
-poetry install
+# Install project dependencies (UV creates and manages the virtual environment automatically)
+uv sync
 
-# Activate virtual environment
-poetry shell
+# UV will automatically use the virtual environment for subsequent commands
 ```
 
 ### 3. Configure Azure Authentication
@@ -134,11 +133,8 @@ az security pricing create --name CloudPosture --tier Standard
 ### Start the Development Server
 
 ```bash
-# Using Poetry
-poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-
-# Or if already in Poetry shell
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+# Using UV
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at:
@@ -194,15 +190,15 @@ docker ps
 
 ```bash
 # Run all tests with coverage
-poetry run pytest
+uv run pytest
 
 # Run with verbose output
-poetry run pytest -v
+uv run pytest -v
 
 # Run specific test type
-poetry run pytest tests/contract/
-poetry run pytest tests/integration/
-poetry run pytest tests/unit/
+uv run pytest tests/contract/
+uv run pytest tests/integration/
+uv run pytest tests/unit/
 ```
 
 ### Test-Driven Development Workflow
@@ -216,7 +212,7 @@ Per constitution Principle V, follow the **Red-Green-Refactor** cycle:
 touch tests/unit/test_new_feature.py
 
 # Write test that will fail (no implementation yet)
-poetry run pytest tests/unit/test_new_feature.py
+uv run pytest tests/unit/test_new_feature.py
 # Expected: FAILED (as implementation doesn't exist)
 ```
 
@@ -224,7 +220,7 @@ poetry run pytest tests/unit/test_new_feature.py
 
 ```bash
 # Implement feature in src/
-poetry run pytest tests/unit/test_new_feature.py
+uv run pytest tests/unit/test_new_feature.py
 # Expected: PASSED
 ```
 
@@ -232,7 +228,7 @@ poetry run pytest tests/unit/test_new_feature.py
 
 ```bash
 # Refactor implementation
-poetry run pytest tests/unit/test_new_feature.py
+uv run pytest tests/unit/test_new_feature.py
 # Expected: PASSED (tests still green)
 ```
 
@@ -240,21 +236,21 @@ poetry run pytest tests/unit/test_new_feature.py
 
 ```bash
 # Test that API responses match OpenAPI schema
-poetry run pytest tests/contract/ -v
+uv run pytest tests/contract/ -v
 ```
 
 ### Integration Tests (End-to-End Workflows)
 
 ```bash
 # Test complete workflows (retrieve → assign → notify)
-poetry run pytest tests/integration/ -v
+uv run pytest tests/integration/ -v
 ```
 
 ### Unit Tests (Business Logic)
 
 ```bash
 # Test individual services and components
-poetry run pytest tests/unit/ -v
+uv run pytest tests/unit/ -v
 ```
 
 ## Development Tools
@@ -262,21 +258,18 @@ poetry run pytest tests/unit/ -v
 ### Code Formatting
 
 ```bash
-# Format code with black
-poetry run black src/ tests/
+# Format code with ruff
+uv run ruff format src/ tests/
 
-# Sort imports with isort
-poetry run isort src/ tests/
+# Check code with ruff linter
+uv run ruff check src/ tests/
 ```
 
-### Linting
+### Type Checking
 
 ```bash
-# Run flake8 linter
-poetry run flake8 src/ tests/
-
 # Run mypy type checker
-poetry run mypy src/
+uv run mypy src/
 ```
 
 ### Pre-commit Hooks
@@ -285,15 +278,14 @@ Install pre-commit hooks to ensure code quality:
 
 ```bash
 # Install pre-commit
-poetry run pre-commit install
+uv run pre-commit install
 
 # Run hooks manually
-poetry run pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 The hooks will run automatically on `git commit` and check:
-- Code formatting (black, isort)
-- Linting (flake8)
+- Code formatting and linting (ruff)
 - Type checking (mypy)
 - Conventional commit messages
 
@@ -351,20 +343,17 @@ sudo systemctl start docker
 docker ps
 ```
 
-### Issue: Poetry Install Fails
+### Issue: UV Sync Fails
 
 **Symptom**: Dependency resolution errors
 
 **Solution**:
 ```bash
-# Clear Poetry cache
-poetry cache clear pypi --all
-
-# Update Poetry
-poetry self update
+# Clear UV cache
+uv cache clean
 
 # Reinstall dependencies
-poetry install --no-cache
+uv sync --refresh
 ```
 
 ## Next Steps
@@ -407,7 +396,7 @@ These define the exact request/response schemas your implementation must match.
 - **Active User Feature**: https://learn.microsoft.com/en-us/azure/defender-for-cloud/active-user
 - **FastAPI Documentation**: https://fastapi.tiangolo.com/
 - **Azure SDK for Python**: https://learn.microsoft.com/en-us/python/api/overview/azure/
-- **Poetry Documentation**: https://python-poetry.org/docs/
+- **UV Documentation**: https://github.com/astral-sh/uv
 - **Conventional Commits**: https://www.conventionalcommits.org/
 - **Semantic Release**: https://github.com/semantic-release/semantic-release
 

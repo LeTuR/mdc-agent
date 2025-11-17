@@ -25,13 +25,13 @@
 **Purpose**: Project initialization and basic structure
 
 - [ ] T001 Create project directory structure (src/, tests/, .github/workflows/) per plan.md
-- [ ] T002 Initialize Python 3.11 project with Poetry and pyproject.toml
+- [ ] T002 Initialize Python 3.14 project with UV and pyproject.toml
 - [ ] T003 [P] Add core dependencies: FastAPI 0.104+, Pydantic 2.x, azure-mgmt-security, azure-identity
-- [ ] T004 [P] Add development dependencies: pytest 7.x, pytest-asyncio, httpx, black, flake8, mypy
+- [ ] T004 [P] Add development dependencies: pytest, pytest-asyncio, httpx, ruff, mypy
 - [ ] T005 [P] Add retry dependency: tenacity library for exponential backoff
-- [ ] T006 [P] Configure pre-commit hooks for black, isort, flake8, mypy, conventional commits
+- [ ] T006 [P] Configure pre-commit hooks for ruff, mypy, conventional commits
 - [ ] T007 Create .env.example file with required Azure environment variables (AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID)
-- [ ] T008 [P] Configure .gitignore for Python, Poetry, .env files, and IDE artifacts
+- [ ] T008 [P] Configure .gitignore for Python, UV, .env files, and IDE artifacts
 - [ ] T009 [P] Create GitHub Actions workflow .github/workflows/ci.yml (lint, test, build)
 - [ ] T010 [P] Create GitHub Actions workflow .github/workflows/release.yml (semantic-release integration)
 

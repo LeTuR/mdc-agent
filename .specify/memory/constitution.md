@@ -1,29 +1,41 @@
 <!--
 SYNC IMPACT REPORT
 ===================
-Version Change: 2.0.0 → 2.0.1
-Action: Patch amendment - Add semantic-release framework reference
+Version Change: 2.0.1 → 2.1.0
+Action: Minor amendment - Python tooling migration to UV and Python 3.14
 
 Modified Principles:
-  - Principle III: Added explicit reference to semantic-release framework URL
-    * Added: Framework link (https://github.com/semantic-release/semantic-release)
-    * Location 1: Principle III rules section
-    * Location 2: GitHub Actions release workflow documentation
+  - NEW Principle VI: Python Tooling & Environment (NON-NEGOTIABLE)
+    * Mandates UV as package manager (replaces Poetry)
+    * Mandates Python 3.14 as minimum version
+    * Mandates pytest (latest) for testing
+    * Specifies uv.lock for reproducible builds
 
-Added Sections: None
+Added Sections:
+  - Principle VI: Python Tooling & Environment
 
 Removed Sections: None
 
-Removed Requirements: None
+Removed Requirements:
+  - Poetry usage (replaced by UV)
+  - Python 3.11 (upgraded to Python 3.14)
 
-Templates Requiring Updates:
-  ✅ plan-template.md - No changes required (no new gates)
-  ✅ spec-template.md - No changes required
-  ✅ tasks-template.md - No changes required
+Templates & Artifacts Requiring Updates:
+  ⚠ plan.md - Update Python 3.11 → 3.14, Poetry → UV
+  ⚠ tasks.md - Update T002 (Poetry init → UV init), dependencies tasks
+  ⚠ quickstart.md - Replace Poetry installation/usage with UV
+  ⚠ research.md - Update technology stack references
+  ⚠ CLAUDE.md - Update framework and language version
+  ⚠ All GitHub issues (#1-#86) - Update references in issue descriptions
 
-Follow-up TODOs: None
+Follow-up TODOs:
+  - Update all spec artifacts to reference UV instead of Poetry
+  - Update GitHub issues created with Poetry references
+  - Regenerate tasks.md with UV-based setup instructions
+  - Update quickstart guide with UV commands
 
 Previous Versions:
+  - v2.0.1 (2025-11-17): Add semantic-release framework reference
   - v2.0.0 (2025-11-17): TDD adoption and GitHub Actions CI/CD specification
   - v1.0.0 (2025-11-17): Initial constitution ratification
 ===================
@@ -120,6 +132,27 @@ All implementation MUST follow Test-Driven Development practice. Tests are writt
 
 **Rationale**: TDD ensures every feature is testable by design and prevents untested code. Writing tests first forces clear thinking about interfaces and behavior. Coverage metrics can create false confidence; test quality and coverage naturally emerge from TDD practice.
 
+### VI. Python Tooling & Environment (NON-NEGOTIABLE)
+
+All Python projects MUST use UV as the package manager and Python 3.14 as the minimum language version.
+
+**Rules**:
+- Package manager: UV (https://github.com/astral-sh/uv) MUST be used instead of Poetry/pip
+- Python version: Python 3.14 or later MUST be used
+- Testing framework: pytest (latest version) MUST be used for all tests
+- Dependency management:
+  - Dependencies MUST be declared in `pyproject.toml`
+  - Lock file (`uv.lock`) MUST be committed for reproducible builds
+  - Use `uv sync` for installing dependencies
+  - Use `uv add` for adding new dependencies
+- Virtual environments:
+  - UV automatically manages virtual environments
+  - Use `uv run` to execute commands in the virtual environment
+- Pre-commit hooks MUST work with UV-managed environment
+- CI/CD workflows MUST use UV for dependency installation
+
+**Rationale**: UV is significantly faster than Poetry (10-100x for some operations) and provides better dependency resolution. Python 3.14 includes performance improvements and modern language features. UV's speed improves developer experience and CI/CD pipeline performance.
+
 ## Development Workflow & CI/CD
 
 ### Branch Strategy
@@ -139,9 +172,10 @@ For every feature or bug fix:
 ### Pre-commit Hooks
 All developers MUST have pre-commit hooks installed and active:
 - `commitlint`: Enforce conventional commit messages
-- `black` / `ruff`: Python code formatting and linting
-- `mypy`: Type checking (if using Python)
+- `ruff`: Python code formatting and linting (replaces black + flake8)
+- `mypy`: Type checking
 - Fast unit tests (< 10 seconds total)
+- Run via: `uv run pre-commit install`
 
 ### CI Pipeline (GitHub Actions - MANDATORY)
 
@@ -153,9 +187,9 @@ Triggers: Pull requests and pushes to main
 
 Jobs:
 1. **Lint and Format**
-   - Run code formatters (black/ruff)
-   - Run linters
-   - Run type checker (mypy)
+   - Install dependencies with `uv sync`
+   - Run code formatter and linter (`uv run ruff check` and `uv run ruff format`)
+   - Run type checker (`uv run mypy`)
 2. **Test**
    - Run all tests (unit, contract, integration)
    - Fail fast on any test failure
@@ -228,4 +262,4 @@ Where possible, principles MUST be enforced by tooling:
 - API schema validation enforces contract compliance
 - Semantic-release enforces versioning rules
 
-**Version**: 2.0.1 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-17
+**Version**: 2.1.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-17

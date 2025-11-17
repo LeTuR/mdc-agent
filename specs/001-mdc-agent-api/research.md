@@ -313,7 +313,8 @@ app.openapi = custom_openapi
 ## Technology Stack Summary
 
 **Core**:
-- Python 3.11
+- Python 3.14
+- UV (package manager)
 - FastAPI 0.104+
 - Pydantic 2.x
 
@@ -326,7 +327,7 @@ app.openapi = custom_openapi
 - ~~PostgreSQL~~ (NOT NEEDED - Azure is source of truth)
 
 **Testing**:
-- pytest 7.x
+- pytest
 - pytest-asyncio
 - HTTPX (test client)
 

@@ -13,10 +13,11 @@ Build a REST API that simplifies LLM agent interaction with Azure Microsoft Defe
 
 ## Technical Context
 
-**Language/Version**: Python 3.11
+**Language/Version**: Python 3.14
+**Package Manager**: UV (https://github.com/astral-sh/uv)
 **Primary Dependencies**: FastAPI 0.104+, Azure SDK (azure-mgmt-security, azure-identity), Pydantic 2.x, HTTPX (async HTTP client)
 **Storage**: PostgreSQL 15+ (for assignments, notification rules, audit logs); Azure Defender for Cloud (source of truth for recommendations/exemptions)
-**Testing**: pytest 7.x, pytest-asyncio, Testcontainers (for integration tests)
+**Testing**: pytest, pytest-asyncio, Testcontainers (for integration tests)
 **Target Platform**: Linux server (Docker container), deployable to Azure Container Apps or AKS
 **Project Type**: single (API-only service)
 **Performance Goals**: <5s for 1000 recommendations, <10s batch assignment (50 items), <200ms p95 for individual operations
