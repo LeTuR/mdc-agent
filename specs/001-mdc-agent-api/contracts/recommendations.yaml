@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: MDC Agent API - Recommendations
+  version: 1.0.0
+  description: |
+    Endpoints for retrieving security recommendations from Azure Microsoft Defender for Cloud.
+    Optimized for LLM agent consumption with snake_case fields and <1MB responses.
+  x-llm-optimized: true
+  x-response-format: snake_case
+
+servers:
+  - url: https://api.mdc-agent.example.com/v1
+    description: Production API
+
+security:
+  - AzureAD: []
+
+paths:
+  /recommendations:
+    get:
+      summary: List security recommendations
+      description: |
+        Retrieve security recommendations from Azure Defender for Cloud with optional filtering.
+        Maps to FR-001, FR-002. Supports User Story 1 acceptance scenarios.
+      operationId: listRecommendations
+      tags:
+        - Recommendations
+      parameters:
+        - name: subscription_id
+          in: query
+          description: Azure subscription ID to filter recommendations
+          required: false
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        - name: severity
+          in: query
+          description: Filter by severity level (can specify multiple)
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [Critical, High, Medium, Low]
+          style: form
+          explode: true
+        - name: resource_type
+          in: query
+          description: Filter by Azure resource type (e.g., "Microsoft.Compute/virtualMachines")
+          required: false
+          schema:
+            type: string
+        - name: resource_group
+          in: query
+          description: Filter by resource group name
+          required: false
+          schema:
+            type: string
+        - name: assignment_status
+          in: query
+          description: Filter by assignment status
+          required: false
+          schema:
+            type: string
+            enum: [assigned, unassigned, overdue, all]
+            default: all
+        - name: assessment_status
+          in: query
+          description: Filter by assessment health status
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [Healthy, Unhealthy, NotApplicable]
+          style: form
+          explode: true
+        - name: limit
+          in: query
+          description: Maximum number of recommendations to return (pagination)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          description: Number of recommendations to skip (pagination)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successfully retrieved recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationListResponse'
+              examples:
+                with_assignments:
+                  summary: Recommendations with active user assignments
+                  value:
+                    recommendations:
+                      - recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                        severity: High
+                        title: "Enable disk encryption on virtual machines"
+                        description: "Virtual machines without disk encryption are vulnerable to data theft"
+                        affected_resources:
+                          - resource_id: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                            resource_type: "Microsoft.Compute/virtualMachines"
+                            resource_name: "vm-web-01"
+                        remediation_steps: "Enable Azure Disk Encryption for VM disks in the Azure Portal"
+                        assessment_status: Unhealthy
+                        compliance_standards: ["CIS", "PCI-DSS"]
+                        assigned_user:
+                          user_email: "alice@contoso.com"
+                          user_name: "Alice Smith"
+                          assignment_date: "2025-11-15T10:30:00Z"
+                          notification_sent: true
+                        due_date: "2025-12-15"
+                        grace_period_enabled: true
+                        subscription_id: "12345678-1234-1234-1234-123456789012"
+                        resource_group: "rg-prod"
+                    total_count: 1
+                    limit: 100
+                    offset: 0
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "INVALID_PARAMETER"
+                message: "Invalid severity value"
+                details:
+                  parameter: "severity"
+                  provided_value: "InvalidLevel"
+                  valid_values: ["Critical", "High", "Medium", "Low"]
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AzureAD:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure Active Directory OAuth2 token
+
+  schemas:
+    Recommendation:
+      type: object
+      required:
+        - recommendation_id
+        - severity
+        - title
+        - description
+        - affected_resources
+        - remediation_steps
+        - assessment_status
+        - subscription_id
+      properties:
+        recommendation_id:
+          type: string
+          description: Azure assessment ID (unique identifier)
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        severity:
+          type: string
+          enum: [Critical, High, Medium, Low]
+          description: Severity level of the security finding
+        title:
+          type: string
+          description: Short recommendation title
+          example: "Enable disk encryption on virtual machines"
+        description:
+          type: string
+          description: Detailed explanation of the security issue
+          example: "Virtual machines without disk encryption are vulnerable to data theft"
+        affected_resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+          description: List of affected Azure resources
+          minItems: 1
+        remediation_steps:
+          type: string
+          description: Instructions on how to fix the issue
+          example: "Enable Azure Disk Encryption for VM disks in the Azure Portal"
+        assessment_status:
+          type: string
+          enum: [Healthy, Unhealthy, NotApplicable]
+          description: Current health status of the assessment
+        compliance_standards:
+          type: array
+          items:
+            type: string
+          description: Related compliance frameworks (e.g., "CIS", "PCI-DSS")
+          example: ["CIS", "PCI-DSS"]
+        assigned_user:
+          $ref: '#/components/schemas/AssignedUser'
+          description: Present if Active User assignment exists
+        due_date:
+          type: string
+          format: date
+          description: Assignment due date (ISO 8601 format)
+          example: "2025-12-15"
+        grace_period_enabled:
+          type: boolean
+          description: Whether grace period is active for this assignment
+          example: true
+        subscription_id:
+          type: string
+          format: uuid
+          description: Azure subscription containing the resource
+          example: "12345678-1234-1234-1234-123456789012"
+        resource_group:
+          type: string
+          description: Resource group name (if applicable)
+          example: "rg-prod"
+
+    Resource:
+      type: object
+      required:
+        - resource_id
+        - resource_type
+        - resource_name
+      properties:
+        resource_id:
+          type: string
+          description: Azure resource ID (full ARM path)
+          example: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+        resource_type:
+          type: string
+          description: Azure resource type
+          example: "Microsoft.Compute/virtualMachines"
+        resource_name:
+          type: string
+          description: Display name of the resource
+          example: "vm-web-01"
+
+    AssignedUser:
+      type: object
+      required:
+        - user_email
+        - user_name
+        - assignment_date
+        - notification_sent
+      properties:
+        user_email:
+          type: string
+          format: email
+          description: Email address of assigned user
+          example: "alice@contoso.com"
+        user_name:
+          type: string
+          description: Display name of assigned user
+          example: "Alice Smith"
+        assignment_date:
+          type: string
+          format: date-time
+          description: When the assignment was created (ISO 8601)
+          example: "2025-11-15T10:30:00Z"
+        notification_sent:
+          type: boolean
+          description: Whether Azure sent email notification
+          example: true
+
+    RecommendationListResponse:
+      type: object
+      required:
+        - recommendations
+        - total_count
+        - limit
+        - offset
+      properties:
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+          description: List of recommendations matching filters
+        total_count:
+          type: integer
+          description: Total number of recommendations (across all pages)
+          example: 1
+        limit:
+          type: integer
+          description: Maximum items per page
+          example: 100
+        offset:
+          type: integer
+          description: Number of items skipped
+          example: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable error code
+          example: "INVALID_PARAMETER"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid severity value"
+        details:
+          type: object
+          description: Additional error context (structure varies by error type)
+          additionalProperties: true
+          example:
+            parameter: "severity"
+            provided_value: "InvalidLevel"
+            valid_values: ["Critical", "High", "Medium", "Low"]

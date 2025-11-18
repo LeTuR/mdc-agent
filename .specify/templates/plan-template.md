@@ -31,7 +31,16 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with `.specify/memory/constitution.md` principles:
+
+- [ ] **API-First Design**: Feature starts with OpenAPI/contract definition (contracts/ directory)
+- [ ] **Agent-Optimized Interface**: Response schemas are LLM-friendly (snake_case, actionable fields, <1MB)
+- [ ] **Conventional Commits**: Branch follows `feat/` or `fix/` naming convention
+- [ ] **Azure MDC Integration**: Azure SDK usage is abstracted in service layer with retry logic
+- [ ] **Test-Driven Development (TDD)**: Tests written first (contract → integration → unit), verified to fail before implementation
+- [ ] **GitHub Actions CI/CD**: Workflows defined in `.github/workflows/` (ci.yml, release.yml)
+
+**Complexity Violations** (if any): Document in Complexity Tracking table below
 
 ## Project Structure
 
