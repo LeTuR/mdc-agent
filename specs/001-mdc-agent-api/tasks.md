@@ -43,18 +43,18 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T011 Create src/main.py with FastAPI application initialization and CORS configuration
-- [ ] T012 [P] Implement Azure authentication in src/middleware/auth.py using DefaultAzureCredential
-- [ ] T013 [P] Create error response models in src/models/error.py (ErrorResponse with error_code, message, details)
-- [ ] T014 [P] Implement global error handler in src/middleware/error_handler.py with LLM-friendly responses
-- [ ] T015 [P] Setup request/response logging middleware in src/middleware/logging.py
-- [ ] T016 [P] Create base Azure Defender client wrapper in src/services/azure_defender.py with retry logic
-- [ ] T017 Configure tenacity retry decorator for Azure API calls with exponential backoff (1s to 60s max)
-- [ ] T018 [P] Implement snake_case transformation utility in src/utils/transformers.py (PascalCase → snake_case)
-- [ ] T019 [P] Create response size validator in src/utils/validators.py to ensure <1MB responses
-- [ ] T020 Implement custom OpenAPI schema generation in src/main.py with x-llm-optimized metadata
-- [ ] T021 [P] Setup pytest configuration in tests/conftest.py with Azure client mocking fixtures
-- [ ] T022 [P] Create test utilities in tests/utils/azure_mocks.py for mocking Azure SDK responses
+- [X] T011 Create src/main.py with FastAPI application initialization and CORS configuration
+- [X] T012 [P] Implement Azure authentication in src/middleware/auth.py using DefaultAzureCredential
+- [X] T013 [P] Create error response models in src/models/error.py (ErrorResponse with error_code, message, details)
+- [X] T014 [P] Implement global error handler in src/middleware/error_handler.py with LLM-friendly responses
+- [X] T015 [P] Setup request/response logging middleware in src/middleware/logging.py
+- [X] T016 [P] Create base Azure Defender client wrapper in src/services/azure_defender.py with retry logic
+- [X] T017 Configure tenacity retry decorator for Azure API calls with exponential backoff (1s to 60s max)
+- [X] T018 [P] Implement snake_case transformation utility in src/utils/transformers.py (PascalCase → snake_case)
+- [X] T019 [P] Create response size validator in src/utils/validators.py to ensure <1MB responses
+- [X] T020 Implement custom OpenAPI schema generation in src/main.py with x-llm-optimized metadata
+- [X] T021 [P] Setup pytest configuration in tests/conftest.py with Azure client mocking fixtures
+- [X] T022 [P] Create test utilities in tests/utils/azure_mocks.py for mocking Azure SDK responses
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
