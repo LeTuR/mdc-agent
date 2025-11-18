@@ -1,0 +1,673 @@
+openapi: 3.1.0
+info:
+  title: MDC Agent API - Active User Assignments
+  version: 1.0.0
+  description: |
+    Endpoints for Azure Defender for Cloud Active User feature integration.
+    Provides intelligent user assignment suggestions, assignment creation, and notification tracking.
+    Optimized for LLM agent consumption with snake_case fields and <1MB responses.
+  x-llm-optimized: true
+  x-response-format: snake_case
+
+servers:
+  - url: https://api.mdc-agent.example.com/v1
+    description: Production API
+
+security:
+  - AzureAD: []
+
+paths:
+  /active-user/suggestions:
+    get:
+      summary: Get Active User suggestions
+      description: |
+        Retrieve up to 3 user suggestions from Azure Defender Active User API based on resource activity.
+        Maps to FR-005, FR-006. Supports User Story 3 acceptance scenario 1.
+        Requires Defender CSPM plan enabled on subscription.
+      operationId: getActiveUserSuggestions
+      tags:
+        - Active User
+      parameters:
+        - name: recommendation_id
+          in: query
+          description: Azure assessment ID to get user suggestions for
+          required: true
+          schema:
+            type: string
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+      responses:
+        '200':
+          description: Successfully retrieved Active User suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveUserSuggestionsResponse'
+              examples:
+                three_suggestions:
+                  summary: Three suggested users ranked by confidence
+                  value:
+                    recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                    suggestions:
+                      - user_email: "alice@contoso.com"
+                        user_name: "Alice Smith"
+                        department: "Infrastructure"
+                        role: "Cloud Engineer"
+                        manager: "Bob Johnson"
+                        confidence_score: 95
+                        recent_activities:
+                          - action: "Microsoft.Compute/virtualMachines/write"
+                            timestamp: "2025-11-16T09:15:00Z"
+                            resource_id: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                          - action: "Microsoft.Compute/virtualMachines/start/action"
+                            timestamp: "2025-11-15T14:22:00Z"
+                            resource_id: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                        suggestion_rank: 1
+                      - user_email: "bob@contoso.com"
+                        user_name: "Bob Johnson"
+                        department: "Infrastructure"
+                        role: "Senior Cloud Architect"
+                        manager: "Carol White"
+                        confidence_score: 78
+                        recent_activities:
+                          - action: "Microsoft.Compute/virtualMachines/read"
+                            timestamp: "2025-11-14T11:30:00Z"
+                            resource_id: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                        suggestion_rank: 2
+                      - user_email: "carol@contoso.com"
+                        user_name: "Carol White"
+                        department: "Security"
+                        role: "Security Manager"
+                        confidence_score: 45
+                        recent_activities:
+                          - action: "Microsoft.Security/assessments/read"
+                            timestamp: "2025-11-10T08:00:00Z"
+                            resource_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                        suggestion_rank: 3
+                no_suggestions:
+                  summary: No suggestions available (new resource, no activity)
+                  value:
+                    recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/xyz-789"
+                    suggestions: []
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions or CSPM plan not enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cspm_not_enabled:
+                  summary: Defender CSPM plan not enabled
+                  value:
+                    error_code: "CSPM_PLAN_NOT_ENABLED"
+                    message: "Azure Defender CSPM plan is not enabled on this subscription"
+                    details:
+                      subscription_id: "12345678-1234-1234-1234-123456789012"
+                      required_plan: "Defender CSPM"
+                      enable_url: "https://portal.azure.com/#blade/Microsoft_Azure_Security/..."
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /assignments:
+    post:
+      summary: Assign user to recommendation
+      description: |
+        Create user assignment via Azure Defender Active User API. Azure automatically sends email notification.
+        Maps to FR-007, FR-008, FR-009. Supports User Story 3 acceptance scenarios 2, 4.
+        Requires Security Administrator, Owner, or Contributor role and Defender CSPM plan.
+      operationId: createAssignment
+      tags:
+        - Active User
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssignmentRequest'
+            examples:
+              with_due_date_grace:
+                summary: Assignment with due date and grace period
+                value:
+                  recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                  assigned_user_email: "alice@contoso.com"
+                  due_date: "2025-12-15"
+                  grace_period_enabled: true
+              without_due_date:
+                summary: Assignment without due date
+                value:
+                  recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                  assigned_user_email: "bob@contoso.com"
+                  grace_period_enabled: false
+      responses:
+        '201':
+          description: Assignment created successfully, email notification sent by Azure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentResponse'
+              example:
+                assignment_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123/assignments/assign-001"
+                recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                assigned_user_email: "alice@contoso.com"
+                assigned_user_name: "Alice Smith"
+                assigner_id: "user@contoso.com"
+                assignment_date: "2025-11-17T15:00:00Z"
+                due_date: "2025-12-15"
+                grace_period_enabled: true
+                assignment_status: "active"
+                notification_sent_timestamp: "2025-11-17T15:00:05Z"
+                notification_delivery_status: "sent"
+        '400':
+          description: Invalid request (validation failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_email:
+                  summary: Invalid user email format
+                  value:
+                    error_code: "VALIDATION_ERROR"
+                    message: "Invalid email address format"
+                    details:
+                      field: "assigned_user_email"
+                      provided_value: "not-an-email"
+                due_date_past:
+                  summary: Due date in the past
+                  value:
+                    error_code: "VALIDATION_ERROR"
+                    message: "Due date must be in the future"
+                    details:
+                      field: "due_date"
+                      provided_value: "2024-01-01"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions or CSPM plan not enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficient_role:
+                  summary: User lacks required role
+                  value:
+                    error_code: "ASSIGNMENT_PERMISSION_DENIED"
+                    message: "User lacks required role for assignment creation"
+                    details:
+                      required_roles: ["Security Administrator", "Owner", "Contributor"]
+                      user_roles: ["Reader"]
+                cspm_not_enabled:
+                  summary: CSPM plan not enabled
+                  value:
+                    error_code: "CSPM_PLAN_NOT_ENABLED"
+                    message: "Azure Defender CSPM plan is not enabled on this subscription"
+                    details:
+                      subscription_id: "12345678-1234-1234-1234-123456789012"
+        '404':
+          description: Recommendation or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_not_found:
+                  summary: User not found in Azure AD
+                  value:
+                    error_code: "USER_NOT_FOUND"
+                    message: "User does not exist in Azure Active Directory"
+                    details:
+                      assigned_user_email: "nonexistent@contoso.com"
+        '409':
+          description: Assignment already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "ASSIGNMENT_ALREADY_EXISTS"
+                message: "An active assignment already exists for this recommendation"
+                details:
+                  existing_assignment_id: "/subscriptions/.../assignments/assign-001"
+                  assigned_user_email: "alice@contoso.com"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: Query assignment history
+      description: |
+        Retrieve assignment history from Azure Defender with filtering options.
+        Maps to FR-010, FR-011, FR-012. Supports User Story 3 acceptance scenarios 3, 5, 6.
+      operationId: listAssignments
+      tags:
+        - Active User
+      parameters:
+        - name: subscription_id
+          in: query
+          description: Filter by Azure subscription ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: resource_group
+          in: query
+          description: Filter by resource group name
+          required: false
+          schema:
+            type: string
+        - name: recommendation_id
+          in: query
+          description: Filter by specific recommendation
+          required: false
+          schema:
+            type: string
+        - name: assignment_status
+          in: query
+          description: Filter by assignment status
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [active, completed, overdue]
+          style: form
+          explode: true
+        - name: due_date_before
+          in: query
+          description: Filter assignments due before this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: due_date_after
+          in: query
+          description: Filter assignments due after this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: assigned_user_email
+          in: query
+          description: Filter by assigned user email
+          required: false
+          schema:
+            type: string
+            format: email
+        - name: limit
+          in: query
+          description: Maximum number of assignments to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          description: Number of assignments to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successfully retrieved assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentListResponse'
+              examples:
+                mixed_status:
+                  summary: Assignments with various statuses
+                  value:
+                    assignments:
+                      - assignment_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123/assignments/assign-001"
+                        recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                        assigned_user_email: "alice@contoso.com"
+                        assigned_user_name: "Alice Smith"
+                        assigner_id: "user@contoso.com"
+                        assignment_date: "2025-11-15T10:30:00Z"
+                        due_date: "2025-12-15"
+                        grace_period_enabled: true
+                        assignment_status: "active"
+                        notification_sent_timestamp: "2025-11-15T10:30:05Z"
+                        notification_delivery_status: "delivered"
+                      - assignment_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/xyz-789/assignments/assign-002"
+                        recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/xyz-789"
+                        assigned_user_email: "bob@contoso.com"
+                        assigned_user_name: "Bob Johnson"
+                        assigner_id: "admin@contoso.com"
+                        assignment_date: "2025-10-20T08:00:00Z"
+                        due_date: "2025-11-10"
+                        grace_period_enabled: false
+                        assignment_status: "overdue"
+                        notification_sent_timestamp: "2025-10-20T08:00:03Z"
+                        notification_delivery_status: "delivered"
+                      - assignment_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/def-456/assignments/assign-003"
+                        recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/def-456"
+                        assigned_user_email: "carol@contoso.com"
+                        assigned_user_name: "Carol White"
+                        assigner_id: "user@contoso.com"
+                        assignment_date: "2025-11-01T12:00:00Z"
+                        grace_period_enabled: true
+                        assignment_status: "completed"
+                        notification_sent_timestamp: "2025-11-01T12:00:04Z"
+                        notification_delivery_status: "delivered"
+                        completion_timestamp: "2025-11-05T16:45:00Z"
+                    total_count: 3
+                    limit: 100
+                    offset: 0
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AzureAD:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure Active Directory OAuth2 token
+
+  schemas:
+    ActiveUserSuggestion:
+      type: object
+      required:
+        - user_email
+        - user_name
+        - confidence_score
+        - recent_activities
+        - suggestion_rank
+      properties:
+        user_email:
+          type: string
+          format: email
+          description: User's email address
+          example: "alice@contoso.com"
+        user_name:
+          type: string
+          description: Display name
+          example: "Alice Smith"
+        department:
+          type: string
+          description: User's department/org unit
+          example: "Infrastructure"
+        role:
+          type: string
+          description: Job role/title
+          example: "Cloud Engineer"
+        manager:
+          type: string
+          description: Manager's name
+          example: "Bob Johnson"
+        confidence_score:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Confidence this user is appropriate (Azure calculated)
+          example: 95
+        recent_activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+          description: Control plane actions on related resources
+          minItems: 1
+        suggestion_rank:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: Ranking among suggestions (1 = highest confidence)
+          example: 1
+
+    Activity:
+      type: object
+      required:
+        - action
+        - timestamp
+        - resource_id
+      properties:
+        action:
+          type: string
+          description: Azure control plane action
+          example: "Microsoft.Compute/virtualMachines/write"
+        timestamp:
+          type: string
+          format: date-time
+          description: When action occurred (ISO 8601)
+          example: "2025-11-16T09:15:00Z"
+        resource_id:
+          type: string
+          description: Affected resource
+          example: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+
+    ActiveUserSuggestionsResponse:
+      type: object
+      required:
+        - recommendation_id
+        - suggestions
+      properties:
+        recommendation_id:
+          type: string
+          description: Assessment ID for which suggestions were requested
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveUserSuggestion'
+          description: Up to 3 suggested users, ranked by confidence
+          maxItems: 3
+
+    CreateAssignmentRequest:
+      type: object
+      required:
+        - recommendation_id
+        - assigned_user_email
+        - grace_period_enabled
+      properties:
+        recommendation_id:
+          type: string
+          description: Azure assessment ID to assign
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        assigned_user_email:
+          type: string
+          format: email
+          description: Email of user to assign (must be valid Azure AD user)
+          example: "alice@contoso.com"
+        due_date:
+          type: string
+          format: date
+          description: Target completion date (must be future date, ISO 8601)
+          example: "2025-12-15"
+        grace_period_enabled:
+          type: boolean
+          description: Whether to enable grace period
+          example: true
+
+    Assignment:
+      type: object
+      required:
+        - assignment_id
+        - recommendation_id
+        - assigned_user_email
+        - assigned_user_name
+        - assigner_id
+        - assignment_date
+        - grace_period_enabled
+        - assignment_status
+      properties:
+        assignment_id:
+          type: string
+          description: Azure assignment ID (unique identifier)
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123/assignments/assign-001"
+        recommendation_id:
+          type: string
+          description: Related assessment ID
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        assigned_user_email:
+          type: string
+          format: email
+          description: Email of assigned user
+          example: "alice@contoso.com"
+        assigned_user_name:
+          type: string
+          description: Display name of assigned user
+          example: "Alice Smith"
+        assigner_id:
+          type: string
+          description: Azure AD user ID or email who created assignment
+          example: "user@contoso.com"
+        assignment_date:
+          type: string
+          format: date-time
+          description: When assignment was created (ISO 8601)
+          example: "2025-11-17T15:00:00Z"
+        due_date:
+          type: string
+          format: date
+          description: Target completion date (ISO 8601)
+          example: "2025-12-15"
+        grace_period_enabled:
+          type: boolean
+          description: Whether grace period is active
+          example: true
+        assignment_status:
+          type: string
+          enum: [active, completed, overdue]
+          description: Current status of assignment
+          example: "active"
+        notification_sent_timestamp:
+          type: string
+          format: date-time
+          description: When Azure sent email notification (ISO 8601)
+          example: "2025-11-17T15:00:05Z"
+        notification_delivery_status:
+          type: string
+          enum: [sent, delivered, failed]
+          description: Email notification delivery status
+          example: "sent"
+        completion_timestamp:
+          type: string
+          format: date-time
+          description: When recommendation was remediated (ISO 8601)
+          example: "2025-11-20T10:30:00Z"
+
+    AssignmentResponse:
+      allOf:
+        - $ref: '#/components/schemas/Assignment'
+
+    AssignmentListResponse:
+      type: object
+      required:
+        - assignments
+        - total_count
+        - limit
+        - offset
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Assignment'
+          description: List of assignments matching filters
+        total_count:
+          type: integer
+          description: Total number of assignments (across all pages)
+          example: 3
+        limit:
+          type: integer
+          description: Maximum items per page
+          example: 100
+        offset:
+          type: integer
+          description: Number of items skipped
+          example: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable error code
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid email address format"
+        details:
+          type: object
+          description: Additional error context (structure varies by error type)
+          additionalProperties: true
+          example:
+            field: "assigned_user_email"
+            provided_value: "not-an-email"

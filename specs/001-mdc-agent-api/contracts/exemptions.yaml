@@ -1,0 +1,256 @@
+openapi: 3.1.0
+info:
+  title: MDC Agent API - Exemptions
+  version: 1.0.0
+  description: |
+    Endpoints for creating and managing security recommendation exemptions in Azure Defender for Cloud.
+    Optimized for LLM agent consumption with snake_case fields and <1MB responses.
+  x-llm-optimized: true
+  x-response-format: snake_case
+
+servers:
+  - url: https://api.mdc-agent.example.com/v1
+    description: Production API
+
+security:
+  - AzureAD: []
+
+paths:
+  /exemptions:
+    post:
+      summary: Create security exemption
+      description: |
+        Create an exemption for a security recommendation in Azure Defender for Cloud.
+        Maps to FR-003, FR-004. Supports User Story 2 acceptance scenarios.
+        Requires Security Admin or Contributor role on the exemption scope.
+      operationId: createExemption
+      tags:
+        - Exemptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExemptionRequest'
+            examples:
+              basic_exemption:
+                summary: Basic exemption with 90-day expiration
+                value:
+                  recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                  justification: "This VM is scheduled for decommission next month and does not require disk encryption"
+                  expiration_date: "2026-02-15"
+                  scope: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                  exemption_category: "Waiver"
+              mitigated_exemption:
+                summary: Exemption for mitigated finding
+                value:
+                  recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/xyz-789"
+                  justification: "Risk mitigated through third-party encryption solution (Vault Enterprise)"
+                  expiration_date: "2026-11-17"
+                  scope: "/subscriptions/12345/resourceGroups/rg-prod"
+                  exemption_category: "Mitigated"
+      responses:
+        '201':
+          description: Exemption created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExemptionResponse'
+              example:
+                exemption_id: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Security/assessments/abc-123/exemptions/ex-001"
+                recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+                justification: "This VM is scheduled for decommission next month and does not require disk encryption"
+                exempted_by: "user@contoso.com"
+                expiration_date: "2026-02-15"
+                scope: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+                creation_timestamp: "2025-11-17T14:22:00Z"
+                exemption_category: "Waiver"
+        '400':
+          description: Invalid request (validation failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                justification_too_short:
+                  summary: Justification text too short
+                  value:
+                    error_code: "VALIDATION_ERROR"
+                    message: "Justification must be at least 10 characters"
+                    details:
+                      field: "justification"
+                      min_length: 10
+                      provided_length: 5
+                invalid_expiration:
+                  summary: Expiration date in the past
+                  value:
+                    error_code: "VALIDATION_ERROR"
+                    message: "Expiration date must be in the future"
+                    details:
+                      field: "expiration_date"
+                      provided_value: "2024-01-01"
+                      current_date: "2025-11-17"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "PERMISSION_DENIED"
+                message: "User lacks Security Administrator role on scope"
+                details:
+                  required_role: "Security Administrator"
+                  scope: "/subscriptions/12345/resourceGroups/rg-prod"
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "RECOMMENDATION_NOT_FOUND"
+                message: "Recommendation does not exist"
+                details:
+                  recommendation_id: "/subscriptions/12345/providers/Microsoft.Security/assessments/invalid-id"
+        '409':
+          description: Conflict (exemption already exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: "EXEMPTION_ALREADY_EXISTS"
+                message: "An active exemption already exists for this recommendation and scope"
+                details:
+                  existing_exemption_id: "/subscriptions/12345/.../exemptions/ex-001"
+                  expiration_date: "2026-02-15"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AzureAD:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Azure Active Directory OAuth2 token
+
+  schemas:
+    CreateExemptionRequest:
+      type: object
+      required:
+        - recommendation_id
+        - justification
+        - expiration_date
+        - scope
+      properties:
+        recommendation_id:
+          type: string
+          description: Azure assessment ID to exempt
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        justification:
+          type: string
+          description: Reason for exempting this finding (minimum 10 characters)
+          minLength: 10
+          example: "This VM is scheduled for decommission next month and does not require disk encryption"
+        expiration_date:
+          type: string
+          format: date
+          description: When this exemption expires (must be future date, ISO 8601 format)
+          example: "2026-02-15"
+        scope:
+          type: string
+          description: Azure scope for the exemption (subscription, resource group, or specific resource)
+          example: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+        exemption_category:
+          type: string
+          enum: [Waiver, Mitigated]
+          description: Azure exemption category (Waiver = accepted risk, Mitigated = risk addressed differently)
+          example: "Waiver"
+
+    ExemptionResponse:
+      type: object
+      required:
+        - exemption_id
+        - recommendation_id
+        - justification
+        - exempted_by
+        - expiration_date
+        - scope
+        - creation_timestamp
+      properties:
+        exemption_id:
+          type: string
+          description: Azure exemption ID (unique identifier)
+          example: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Security/assessments/abc-123/exemptions/ex-001"
+        recommendation_id:
+          type: string
+          description: Related assessment ID
+          example: "/subscriptions/12345/providers/Microsoft.Security/assessments/abc-123"
+        justification:
+          type: string
+          description: Exemption justification text
+          example: "This VM is scheduled for decommission next month and does not require disk encryption"
+        exempted_by:
+          type: string
+          description: Azure AD user ID or email who created the exemption
+          example: "user@contoso.com"
+        expiration_date:
+          type: string
+          format: date
+          description: When exemption expires (ISO 8601)
+          example: "2026-02-15"
+        scope:
+          type: string
+          description: Azure scope of the exemption
+          example: "/subscriptions/12345/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-01"
+        creation_timestamp:
+          type: string
+          format: date-time
+          description: When exemption was created (ISO 8601)
+          example: "2025-11-17T14:22:00Z"
+        exemption_category:
+          type: string
+          enum: [Waiver, Mitigated]
+          description: Azure exemption category
+          example: "Waiver"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable error code
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Justification must be at least 10 characters"
+        details:
+          type: object
+          description: Additional error context (structure varies by error type)
+          additionalProperties: true
+          example:
+            field: "justification"
+            min_length: 10
+            provided_length: 5
