@@ -70,24 +70,24 @@
 
 > **TDD REQUIREMENT: Write these tests FIRST, verify they FAIL, then implement**
 
-- [ ] T023 [P] [US1] Contract test for GET /v1/recommendations in tests/contract/test_recommendations_contract.py validating OpenAPI schema
-- [ ] T024 [P] [US1] Integration test for recommendation retrieval workflow in tests/integration/test_recommendation_workflow.py
-- [ ] T025 [P] [US1] Unit test for Azure Defender service recommendation parsing in tests/unit/test_azure_defender_service.py
-- [ ] T026 [P] [US1] Unit test for snake_case transformation in tests/unit/test_transformers.py
+- [X] T023 [P] [US1] Contract test for GET /v1/recommendations in tests/contract/test_recommendations_contract.py validating OpenAPI schema
+- [X] T024 [P] [US1] Integration test for recommendation retrieval workflow in tests/integration/test_recommendation_workflow.py
+- [X] T025 [P] [US1] Unit test for Azure Defender service recommendation parsing in tests/unit/test_azure_defender_service.py
+- [X] T026 [P] [US1] Unit test for snake_case transformation in tests/unit/test_transformers.py
 
 ### Implementation for User Story 1
 
-- [ ] T027 [P] [US1] Create Recommendation Pydantic model in src/models/recommendation.py with all fields from data-model.md
-- [ ] T028 [P] [US1] Create Resource sub-entity model in src/models/recommendation.py
-- [ ] T029 [P] [US1] Create AssignedUser sub-entity model in src/models/recommendation.py
-- [ ] T030 [US1] Implement list_recommendations method in src/services/azure_defender.py using SecurityCenter.assessments.list
-- [ ] T031 [US1] Add filtering logic in src/services/azure_defender.py for severity, resource_type, subscription, assignment_status
-- [ ] T032 [US1] Add pagination support (limit/offset) in src/services/azure_defender.py
-- [ ] T033 [US1] Implement GET /v1/recommendations endpoint in src/api/v1/recommendations.py
-- [ ] T034 [US1] Add query parameter validation for filters in src/api/v1/recommendations.py
-- [ ] T035 [US1] Apply snake_case transformation to recommendation responses in src/api/v1/recommendations.py
-- [ ] T036 [US1] Add response size validation (<1MB) in src/api/v1/recommendations.py
-- [ ] T037 [US1] Register recommendations router in src/main.py
+- [X] T027 [P] [US1] Create Recommendation Pydantic model in src/models/recommendation.py with all fields from data-model.md
+- [X] T028 [P] [US1] Create Resource sub-entity model in src/models/recommendation.py
+- [X] T029 [P] [US1] Create AssignedUser sub-entity model in src/models/recommendation.py
+- [X] T030 [US1] Implement list_recommendations method in src/services/azure_defender.py using SecurityCenter.assessments.list
+- [X] T031 [US1] Add filtering logic in src/services/azure_defender.py for severity, resource_type, subscription, assignment_status
+- [X] T032 [US1] Add pagination support (limit/offset) in src/services/azure_defender.py
+- [X] T033 [US1] Implement GET /v1/recommendations endpoint in src/api/v1/recommendations.py
+- [X] T034 [US1] Add query parameter validation for filters in src/api/v1/recommendations.py
+- [X] T035 [US1] Apply snake_case transformation to recommendation responses in src/api/v1/recommendations.py
+- [X] T036 [US1] Add response size validation (<1MB) in src/api/v1/recommendations.py
+- [X] T037 [US1] Register recommendations router in src/main.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - LLM agents can retrieve recommendations with filtering and pagination
 

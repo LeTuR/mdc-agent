@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.v1 import recommendations
 from src.middleware.error_handler import handle_exception
 from src.middleware.logging import LoggingMiddleware
 
@@ -138,12 +139,13 @@ def custom_openapi() -> dict[str, Any]:
 # Override default OpenAPI schema generator
 app.openapi = custom_openapi  # type: ignore
 
+# Register routers
+app.include_router(recommendations.router, tags=["Recommendations"])
 
-# Import and register routers (will be added in Phase 3)
-# from src.api.v1 import recommendations, exemptions, assignments
-# app.include_router(recommendations.router, prefix="/v1", tags=["Recommendations"])
-# app.include_router(exemptions.router, prefix="/v1", tags=["Exemptions"])
-# app.include_router(assignments.router, prefix="/v1", tags=["Assignments"])
+# Phase 4 & 5 routers (not yet implemented):
+# from src.api.v1 import exemptions, assignments
+# app.include_router(exemptions.router, tags=["Exemptions"])
+# app.include_router(assignments.router, tags=["Assignments"])
 
 
 if __name__ == "__main__":

@@ -1,40 +1,34 @@
 <!--
 SYNC IMPACT REPORT
 ===================
-Version Change: 2.0.1 → 2.1.0
-Action: Minor amendment - Python tooling migration to UV and Python 3.14
+Version Change: 2.1.0 → 2.2.0
+Action: Minor amendment - Git workflow principle for PR fixes
 
-Modified Principles:
-  - NEW Principle VI: Python Tooling & Environment (NON-NEGOTIABLE)
-    * Mandates UV as package manager (replaces Poetry)
-    * Mandates Python 3.14 as minimum version
-    * Mandates pytest (latest) for testing
-    * Specifies uv.lock for reproducible builds
+Modified Principles: None (no existing principles changed)
 
 Added Sections:
-  - Principle VI: Python Tooling & Environment
+  - Principle VII: Git Workflow & Commit Hygiene (NON-NEGOTIABLE)
+    * Mandates amend commits when fixing PR check failures
+    * Enforces clean commit history without "fix lint" commits
+    * Requires force-push discipline for amended commits
+    * Preserves authorship when amending commits
 
 Removed Sections: None
 
-Removed Requirements:
-  - Poetry usage (replaced by UV)
-  - Python 3.11 (upgraded to Python 3.14)
-
 Templates & Artifacts Requiring Updates:
-  ⚠ plan.md - Update Python 3.11 → 3.14, Poetry → UV
-  ⚠ tasks.md - Update T002 (Poetry init → UV init), dependencies tasks
-  ⚠ quickstart.md - Replace Poetry installation/usage with UV
-  ⚠ research.md - Update technology stack references
-  ⚠ CLAUDE.md - Update framework and language version
-  ⚠ All GitHub issues (#1-#86) - Update references in issue descriptions
+  ✅ plan-template.md - No updates required (already references TDD and conventional commits)
+  ✅ spec-template.md - No updates required (focuses on feature specification)
+  ✅ tasks-template.md - No updates required (focuses on task breakdown)
+  ⚠️ Development documentation - Should reference commit amendment workflow
+  ⚠️ PR review guidelines - Should check for fixup/lint commits that should have been amended
 
 Follow-up TODOs:
-  - Update all spec artifacts to reference UV instead of Poetry
-  - Update GitHub issues created with Poetry references
-  - Regenerate tasks.md with UV-based setup instructions
-  - Update quickstart guide with UV commands
+  - Update developer onboarding docs to include git amend workflow
+  - Consider adding pre-push hook to warn about consecutive commits with similar messages
+  - Document exception cases (when NOT to amend, e.g., after PR approval)
 
 Previous Versions:
+  - v2.1.0 (2025-11-17): Add Python tooling migration to UV and Python 3.14
   - v2.0.1 (2025-11-17): Add semantic-release framework reference
   - v2.0.0 (2025-11-17): TDD adoption and GitHub Actions CI/CD specification
   - v1.0.0 (2025-11-17): Initial constitution ratification
@@ -153,6 +147,36 @@ All Python projects MUST use UV as the package manager and Python 3.14 as the mi
 
 **Rationale**: UV is significantly faster than Poetry (10-100x for some operations) and provides better dependency resolution. Python 3.14 includes performance improvements and modern language features. UV's speed improves developer experience and CI/CD pipeline performance.
 
+### VII. Git Workflow & Commit Hygiene (NON-NEGOTIABLE)
+
+Commit history MUST be clean and meaningful. Fixup commits for PR check failures MUST be avoided by amending existing commits.
+
+**Rules**:
+- When PR checks fail (lint, format, type checking, tests):
+  - Fix the issues locally
+  - Amend the original commit: `git commit --amend --no-edit`
+  - Force push to update PR: `git push --force-with-lease`
+  - NEVER create new commits like "fix lint", "fix tests", "address PR comments" for mechanical fixes
+- Amend commits are MANDATORY for:
+  - Linting/formatting fixes detected by pre-commit hooks or CI
+  - Type checking errors
+  - Trivial test fixes that don't change logic
+  - Documentation typos or formatting
+- New commits are REQUIRED for:
+  - Substantive logic changes requested in PR review
+  - New functionality added after initial PR
+  - Commits already merged to main branch (never amend public history)
+- Force push discipline:
+  - Always use `--force-with-lease` instead of `--force` to prevent accidental overwrites
+  - Verify branch status before force pushing: `git status` and `git log`
+  - Communicate with team if multiple people work on same branch
+- Authorship preservation:
+  - Before amending, verify commit authorship: `git log -1 --format='%an %ae'`
+  - NEVER amend commits authored by others without explicit permission
+  - Use `Co-authored-by:` trailer when amending adds contributions
+
+**Rationale**: Clean commit history improves code review quality, makes git bisect effective, and ensures semantic-release works correctly. Multiple "fix" commits pollute history and make it harder to understand the evolution of changes. Amending commits maintains atomic, meaningful commits that represent complete units of work.
+
 ## Development Workflow & CI/CD
 
 ### Branch Strategy
@@ -168,6 +192,16 @@ For every feature or bug fix:
 4. Refactor for quality while keeping tests green (REFACTOR)
 5. Commit with conventional commit message
 6. Repeat for next requirement
+
+### Git Amendment Workflow (for PR fixes)
+When CI/pre-commit checks fail:
+1. Fix the issues locally (lint, format, types, tests)
+2. Stage changes: `git add -A`
+3. Amend the commit: `git commit --amend --no-edit`
+4. Force push: `git push --force-with-lease`
+5. Verify CI passes on updated PR
+
+Exception: If substantive review feedback requires logic changes, create a new commit following conventional commit format.
 
 ### Pre-commit Hooks
 All developers MUST have pre-commit hooks installed and active:
@@ -228,6 +262,7 @@ PRs MUST NOT be merged unless:
 - No unresolved comments
 - Conventional commit format validated
 - All tests pass (TDD cycle completed)
+- Commit history is clean (no "fix lint" or similar fixup commits)
 
 ### Release Gates
 Releases MUST NOT proceed unless:
@@ -262,4 +297,4 @@ Where possible, principles MUST be enforced by tooling:
 - API schema validation enforces contract compliance
 - Semantic-release enforces versioning rules
 
-**Version**: 2.1.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-17
+**Version**: 2.2.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-18

@@ -44,6 +44,8 @@ class AzureDefenderClient:
         client: SecurityCenter SDK client
     """
 
+    subscription_id: str
+
     def __init__(self, subscription_id: str | None = None) -> None:
         """Initialize Azure Defender client.
 
@@ -54,11 +56,12 @@ class AzureDefenderClient:
         Raises:
             ValueError: If subscription_id not provided and env var not set
         """
-        self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
-        if not self.subscription_id:
+        sub_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
+        if not sub_id:
             raise ValueError(
                 "subscription_id required. Set AZURE_SUBSCRIPTION_ID env var or pass explicitly."
             )
+        self.subscription_id = sub_id
 
         credential = get_azure_credential()
         self.client = SecurityCenter(credential, self.subscription_id)
@@ -67,21 +70,31 @@ class AzureDefenderClient:
     def list_recommendations(
         self,
         scope: str | None = None,
-        severity: str | None = None,
+        severity: list[str] | None = None,
         resource_type: str | None = None,
+        resource_group: str | None = None,
+        assignment_status: str | None = None,
+        assessment_status: list[str] | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List security recommendations with optional filtering.
+        """List security recommendations with optional filtering and pagination.
 
-        Implements User Story 1 requirement (FR-001, FR-002, FR-003).
+        Implements User Story 1 requirement (FR-001, FR-002, FR-003, FR-006, FR-007).
         Uses exponential backoff retry per FR-017.
 
         Args:
             scope: Optional scope filter (subscription/resource group/resource)
-            severity: Optional severity filter (High, Medium, Low)
+            severity: Optional severity filter list (e.g., ["High", "Critical"])
             resource_type: Optional resource type filter
+            resource_group: Optional resource group filter
+            assignment_status: Optional assignment filter (assigned/unassigned/all)
+            assessment_status: Optional assessment status list
+            limit: Maximum number of results to return (pagination)
+            offset: Number of results to skip (pagination)
 
         Returns:
-            List of recommendations as dictionaries
+            List of parsed recommendations as dictionaries (snake_case)
 
         Raises:
             HttpResponseError: If Azure API call fails after retries
@@ -91,44 +104,221 @@ class AzureDefenderClient:
             scope = f"/subscriptions/{self.subscription_id}"
 
         # List all assessments (recommendations) for the scope
-        assessments = self.client.assessments.list(scope=scope)
+        assessments = list(self.client.assessments.list(scope=scope))
 
-        results = []
-        for assessment in assessments:
-            # Convert assessment to dict
-            recommendation = {
-                "id": assessment.id,
-                "name": assessment.name,
-                "type": assessment.type,
-                "properties": {
-                    "resourceDetails": assessment.properties.resource_details,
-                    "displayName": assessment.properties.display_name,
-                    "status": {
-                        "code": assessment.properties.status.code,
-                        "cause": assessment.properties.status.cause,
-                        "description": assessment.properties.status.description,
-                    },
-                    "additionalData": assessment.properties.additional_data,
-                },
+        # Apply filters
+        if severity:
+            assessments = self._filter_by_severity(assessments, severity)
+        if resource_type:
+            assessments = self._filter_by_resource_type(assessments, resource_type)
+        if resource_group:
+            assessments = self._filter_by_resource_group(assessments, resource_group)
+        if assessment_status:
+            assessments = self._filter_by_assessment_status(assessments, assessment_status)
+
+        # Parse assessments to dictionaries
+        parsed_recommendations = [self._parse_assessment(assessment) for assessment in assessments]
+
+        # Apply pagination
+        return self._apply_pagination(parsed_recommendations, limit, offset)
+
+    def _filter_by_severity(self, assessments: list, severities: list[str]) -> list:
+        """Filter assessments by severity levels.
+
+        Args:
+            assessments: List of Azure assessment objects
+            severities: List of severity levels to include
+
+        Returns:
+            Filtered list of assessments
+        """
+        return [
+            a
+            for a in assessments
+            if hasattr(a.properties, "severity") and a.properties.severity in severities
+        ]
+
+    def _filter_by_resource_type(self, assessments: list, resource_type: str) -> list:
+        """Filter assessments by resource type.
+
+        Args:
+            assessments: List of Azure assessment objects
+            resource_type: Resource type to filter by
+
+        Returns:
+            Filtered list of assessments
+        """
+        return [
+            a
+            for a in assessments
+            if hasattr(a.properties, "resource_details")
+            and resource_type in a.properties.resource_details.id
+        ]
+
+    def _filter_by_resource_group(self, assessments: list, resource_group: str) -> list:
+        """Filter assessments by resource group.
+
+        Args:
+            assessments: List of Azure assessment objects
+            resource_group: Resource group name to filter by
+
+        Returns:
+            Filtered list of assessments
+        """
+        return [
+            a
+            for a in assessments
+            if hasattr(a.properties, "resource_details")
+            and f"/resourceGroups/{resource_group}/" in a.properties.resource_details.id
+        ]
+
+    def _filter_by_assessment_status(self, assessments: list, statuses: list[str]) -> list:
+        """Filter assessments by status.
+
+        Args:
+            assessments: List of Azure assessment objects
+            statuses: List of status codes to include
+
+        Returns:
+            Filtered list of assessments
+        """
+        return [
+            a
+            for a in assessments
+            if hasattr(a.properties, "status") and a.properties.status.code in statuses
+        ]
+
+    def _apply_pagination(self, items: list, limit: int, offset: int) -> list:
+        """Apply pagination to a list.
+
+        Args:
+            items: List to paginate
+            limit: Maximum number of items to return
+            offset: Number of items to skip
+
+        Returns:
+            Paginated slice of the list
+        """
+        return items[offset : offset + limit]
+
+    def _parse_assessment(self, assessment: Any) -> dict[str, Any]:
+        """Parse Azure assessment object to recommendation dictionary.
+
+        Transforms PascalCase Azure SDK fields to snake_case and extracts
+        all required fields per data-model.md.
+
+        Args:
+            assessment: Azure SDK assessment object
+
+        Returns:
+            Dictionary with snake_case fields
+        """
+        # Extract resource details
+        resource_details = assessment.properties.resource_details
+        resources = [
+            {
+                "resource_id": resource_details.id,
+                "resource_type": getattr(
+                    resource_details,
+                    "resource_type",
+                    self._extract_resource_type(resource_details.id),
+                ),
+                "resource_name": self._extract_resource_name(resource_details.id),
             }
+        ]
 
-            # Client-side severity filtering (SDK doesn't support server-side)
-            if severity:
-                # Get severity from metadata
-                assessment_severity = getattr(assessment.properties, "severity", None)
-                if assessment_severity and assessment_severity.lower() != severity.lower():
-                    continue
+        # Extract compliance standards from additional data
+        compliance_standards = None
+        if hasattr(assessment.properties, "additional_data"):
+            additional_data = assessment.properties.additional_data or {}
+            if isinstance(additional_data, dict):
+                compliance_standards = additional_data.get("compliance_standards")
 
-            # Client-side resource type filtering
-            if resource_type:
-                resource_details = assessment.properties.resource_details
-                actual_type = getattr(resource_details, "resource_type", None)
-                if actual_type and resource_type.lower() not in actual_type.lower():
-                    continue
+        # Build recommendation dict
+        return {
+            "recommendation_id": assessment.id,
+            "severity": getattr(assessment.properties, "severity", "Medium"),
+            "title": assessment.properties.display_name,
+            "description": getattr(
+                assessment.properties.status,
+                "description",
+                "No description available",
+            ),
+            "affected_resources": resources,
+            "remediation_steps": getattr(
+                assessment.properties,
+                "remediation_description",
+                "Check Azure Defender for Cloud for remediation steps",
+            ),
+            "assessment_status": assessment.properties.status.code,
+            "compliance_standards": compliance_standards,
+            "assigned_user": None,  # TODO: Implement Active User lookup
+            "due_date": None,
+            "grace_period_enabled": None,
+            "subscription_id": self._extract_subscription_id(assessment.id),
+            "resource_group": self._extract_resource_group(resource_details.id),
+        }
 
-            results.append(recommendation)
+    def _extract_subscription_id(self, assessment_id: str) -> str:
+        """Extract subscription ID from assessment ID.
 
-        return results
+        Args:
+            assessment_id: Azure assessment resource ID
+
+        Returns:
+            Subscription ID (UUID)
+        """
+        parts = assessment_id.split("/")
+        try:
+            sub_index = parts.index("subscriptions")
+            return parts[sub_index + 1]
+        except (ValueError, IndexError):
+            return self.subscription_id
+
+    def _extract_resource_group(self, resource_id: str) -> str | None:
+        """Extract resource group from resource ID.
+
+        Args:
+            resource_id: Azure resource ID
+
+        Returns:
+            Resource group name or None if subscription-level
+        """
+        parts = resource_id.split("/")
+        try:
+            rg_index = parts.index("resourceGroups")
+            return parts[rg_index + 1]
+        except (ValueError, IndexError):
+            return None
+
+    def _extract_resource_type(self, resource_id: str) -> str:
+        """Extract resource type from resource ID.
+
+        Args:
+            resource_id: Azure resource ID
+
+        Returns:
+            Resource type (e.g., Microsoft.Compute/virtualMachines)
+        """
+        parts = resource_id.split("/")
+        try:
+            providers_index = parts.index("providers")
+            # Resource type is providers/<namespace>/<type>
+            return f"{parts[providers_index + 1]}/{parts[providers_index + 2]}"
+        except (ValueError, IndexError):
+            return "Unknown"
+
+    def _extract_resource_name(self, resource_id: str) -> str:
+        """Extract resource name from resource ID.
+
+        Args:
+            resource_id: Azure resource ID
+
+        Returns:
+            Resource name (last segment of ID)
+        """
+        parts = resource_id.split("/")
+        return parts[-1] if parts else "Unknown"
 
     @azure_retry
     def get_recommendation(self, assessment_id: str, scope: str | None = None) -> dict[str, Any]:
