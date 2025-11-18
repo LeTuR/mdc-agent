@@ -69,3 +69,8 @@ dmypy.json
 # Temporary files
 *.tmp
 *.temp
+
+# Node.js (for commitlint)
+node_modules/
+package-lock.json
+package.json
