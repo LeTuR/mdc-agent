@@ -41,12 +41,22 @@ def create_mock_assessment(
     mock_properties = Mock()
     mock_properties.display_name = display_name
     mock_properties.severity = severity
+    mock_properties.remediation_description = f"Apply security controls for {display_name}"
 
     # Resource details
     mock_resource_details = Mock()
     mock_resource_details.id = resource_id
     mock_resource_details.source = "Azure"
-    mock_resource_details.resource_type = resource_id.split("/providers/")[1].split("/")[0]
+    try:
+        # Extract full resource type: Microsoft.Compute/virtualMachines
+        provider_part = resource_id.split("/providers/")[1]
+        parts = provider_part.split("/")
+        if len(parts) >= 2:
+            mock_resource_details.resource_type = f"{parts[0]}/{parts[1]}"
+        else:
+            mock_resource_details.resource_type = parts[0]
+    except (IndexError, AttributeError):
+        mock_resource_details.resource_type = "Unknown"
     mock_properties.resource_details = mock_resource_details
 
     # Status
@@ -144,6 +154,79 @@ def create_mock_assignment(
     mock_assignment.updated_at = "2025-11-18T09:00:00Z"
 
     return mock_assignment
+
+
+def create_recommendation_dict(
+    assessment_id: str = "rec-001",
+    display_name: str = "Test Recommendation",
+    severity: str = "High",
+    status_code: str = "Unhealthy",
+    resource_id: str = (
+        "/subscriptions/test-sub/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1"
+    ),
+) -> dict:
+    """Create a recommendation dictionary matching the API response format.
+
+    This matches the output of AzureDefenderClient._parse_assessment(),
+    which is what list_recommendations() actually returns.
+
+    Args:
+        assessment_id: Assessment ID
+        display_name: Human-readable recommendation name
+        severity: Severity level (High, Medium, Low, Critical)
+        status_code: Status code (Healthy, Unhealthy, NotApplicable)
+        resource_id: Full Azure resource ID
+
+    Returns:
+        Dictionary with snake_case fields matching API response schema
+    """
+    # Extract resource type from resource ID
+    try:
+        resource_type = (
+            resource_id.split("/providers/")[1].split("/")[0]
+            + "/"
+            + resource_id.split("/providers/")[1].split("/")[1]
+        )
+    except IndexError:
+        resource_type = "Unknown"
+
+    # Extract resource name (last segment)
+    resource_name = resource_id.split("/")[-1] if "/" in resource_id else "Unknown"
+
+    # Extract resource group
+    try:
+        rg_index = resource_id.split("/").index("resourceGroups")
+        resource_group = resource_id.split("/")[rg_index + 1]
+    except (ValueError, IndexError):
+        resource_group = None
+
+    return {
+        "recommendation_id": (
+            f"/subscriptions/test-sub/providers/Microsoft.Security/assessments/{assessment_id}"
+        ),
+        "severity": severity,
+        "title": display_name,
+        "description": (
+            "Resource does not meet security requirements"
+            if status_code == "Unhealthy"
+            else "Resource is secure"
+        ),
+        "affected_resources": [
+            {
+                "resource_id": resource_id,
+                "resource_type": resource_type,
+                "resource_name": resource_name,
+            }
+        ],
+        "remediation_steps": f"Apply security controls for {display_name}",
+        "assessment_status": status_code,
+        "compliance_standards": None,
+        "assigned_user": None,
+        "due_date": None,
+        "grace_period_enabled": None,
+        "subscription_id": "test-sub",
+        "resource_group": resource_group,
+    }
 
 
 def create_mock_http_response_error(
